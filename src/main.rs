@@ -2,7 +2,8 @@ use gtk::prelude::*;
 use relm4::prelude::*;
 use relm4::{ComponentParts, ComponentSender, RelmApp, SimpleComponent};
 
-use crate::net::send_request;
+use crate::net::{ContentType, send_request};
+mod misc;
 mod net;
 
 pub struct Model {
@@ -11,8 +12,9 @@ pub struct Model {
     content_type: net::ContentType,
     error_message: Option<String>,
     input_enabled: bool,
-    message_body_buff: gtk::TextBuffer,
-    response_text: Option<String>,
+    message_body_buff: sourceview5::Buffer,
+    syntax_language: String,
+    response_body_buff: sourceview5::Buffer,
 }
 
 #[derive(Debug)]
@@ -22,6 +24,7 @@ pub enum States {
     RequestTypeSelected(u32),
     ContentTypeSelected(u32),
     RequestFinished(Result<String, String>),
+    BodySyntaxChanged(ContentType),
 }
 
 #[relm4::component(pub)]
@@ -35,14 +38,21 @@ impl SimpleComponent for Model {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
+        //syntax-highlighting init
+        let inp_sourceview_buff = sourceview5::Buffer::new(None);
+        crate::misc::syntax_highlighter(&inp_sourceview_buff, "json");
+
+        let resp_sourceview_buff = sourceview5::Buffer::new(None);
+        crate::misc::syntax_highlighter(&resp_sourceview_buff, "json");
         let model = Model {
             textbox_text: String::new(),
-            response_text: None,
             request_type: net::RequestType::Get,
             content_type: net::ContentType::Json,
             error_message: None,
             input_enabled: false,
-            message_body_buff: gtk::TextBuffer::new(None),
+            message_body_buff: inp_sourceview_buff,
+            response_body_buff: resp_sourceview_buff,
+            syntax_language: "json".to_string(),
         };
 
         //workaround for checkbutton issue
@@ -64,13 +74,16 @@ impl SimpleComponent for Model {
 
             States::RequestFinished(result) => match result {
                 Ok(res_body) => {
-                    self.response_text = Some(res_body);
+                    crate::misc::syntax_highlighter(
+                        &self.response_body_buff,
+                        crate::misc::auto_detect_lang(&res_body),
+                    );
+                    self.response_body_buff.set_text(&res_body);
                     self.error_message = None;
                 }
 
                 Err(res_err) => {
                     self.error_message = Some(res_err);
-                    self.response_text = None;
                 }
             },
 
@@ -140,6 +153,17 @@ impl SimpleComponent for Model {
                     _ => true,
                 }
             }
+
+            States::BodySyntaxChanged(content_type) => {
+                self.syntax_language = match content_type {
+                    ContentType::Json => "json".to_string(),
+                    ContentType::Text => "text".to_string(),
+                    ContentType::Form => "ini".to_string(),
+                    ContentType::Xml => "xml".to_string(),
+                };
+
+                crate::misc::syntax_highlighter(&self.message_body_buff, &self.syntax_language);
+            }
         }
     }
 
@@ -204,6 +228,7 @@ impl SimpleComponent for Model {
                         connect_toggled[sender] => move |btn| {
                             if btn.is_active() {
                                 sender.input(States::ContentTypeSelected(0));
+                                sender.input(States::BodySyntaxChanged(ContentType::Json));
                             }
                         },
                     },
@@ -215,6 +240,7 @@ impl SimpleComponent for Model {
                         connect_toggled[sender] => move |btn| {
                             if btn.is_active() {
                                 sender.input(States::ContentTypeSelected(1));
+                                sender.input(States::BodySyntaxChanged(ContentType::Text));
                             }
                         },
                     },
@@ -226,6 +252,7 @@ impl SimpleComponent for Model {
                         connect_toggled[sender] => move |btn| {
                             if btn.is_active() {
                                 sender.input(States::ContentTypeSelected(2));
+                                sender.input(States::BodySyntaxChanged(ContentType::Xml));
                             }
                         },
                     },
@@ -237,6 +264,7 @@ impl SimpleComponent for Model {
                         connect_toggled[sender] => move |btn| {
                             if btn.is_active() {
                                 sender.input(States::ContentTypeSelected(3));
+                                sender.input(States::BodySyntaxChanged(ContentType::Form));
                             }
                         },
                     }
@@ -266,7 +294,7 @@ impl SimpleComponent for Model {
                     set_hexpand: true,
 
                     #[wrap(Some)]
-                    set_child = &gtk::TextView {
+                    set_child = &sourceview5::View {
 
                         //set_placeholder_text: Some("Request content"),
                         set_monospace: true,
@@ -284,14 +312,14 @@ impl SimpleComponent for Model {
                     set_hexpand: true,
 
                     #[wrap(Some)]
-                    set_child = &gtk::Label {
-                        set_selectable: true,
-                        set_halign: gtk::Align::Start,
-                        set_valign: gtk::Align::Start,
-                        set_wrap: true,
+                    set_child = &sourceview5::View {
+                        set_cursor_visible: false,
+                        set_editable: false,
+                        set_monospace: true,
 
                         #[watch]
-                        set_label: model.response_text.as_deref().unwrap_or(""),
+                        set_buffer: Some(&model.response_body_buff),
+
                     }
 
                 },
@@ -310,14 +338,15 @@ fn main() {
         .send-button {
             background-color: #3584e4;
         }
+
         .input-box{
             border-radius: 12px;
             padding: 16px;
 
-            background-color: #38383c;
+            background-color: #1d1d20;
         }
 
-        .input-box textview {
+        .indput-box sourceview {
             background-color: transparent;
             color: #fcfcfc;
             font-family: monospace;
@@ -328,10 +357,10 @@ fn main() {
             border-radius: 12px;
             padding: 16px;
 
-            background-color: #38383c;
+            background-color: #1d1d20;
         }
 
-        .output-box label {
+        .output-box sourceview {
             background-color: transparent;
             color: #fcfcfc;
             font-family: monospace;
