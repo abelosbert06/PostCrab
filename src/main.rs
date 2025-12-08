@@ -15,6 +15,7 @@ pub struct Model {
     message_body_buff: sourceview5::Buffer,
     syntax_language: String,
     response_body_buff: sourceview5::Buffer,
+    response_processing: bool,
 }
 
 #[derive(Debug)]
@@ -53,6 +54,7 @@ impl SimpleComponent for Model {
             message_body_buff: inp_sourceview_buff,
             response_body_buff: resp_sourceview_buff,
             syntax_language: "json".to_string(),
+            response_processing: false,
         };
 
         //workaround for checkbutton issue
@@ -74,6 +76,7 @@ impl SimpleComponent for Model {
 
             States::RequestFinished(result) => match result {
                 Ok(res_body) => {
+                    self.response_processing = false;
                     crate::misc::syntax_highlighter(
                         &self.response_body_buff,
                         crate::misc::auto_detect_lang(&res_body),
@@ -83,6 +86,7 @@ impl SimpleComponent for Model {
                 }
 
                 Err(res_err) => {
+                    self.response_processing = false;
                     self.error_message = Some(res_err);
                 }
             },
@@ -108,6 +112,7 @@ impl SimpleComponent for Model {
                     };
 
                     let input_sender = sender.input_sender().clone();
+                    self.response_processing = true;
                     relm4::spawn(async move {
                         let result = send_request(
                             &clean_address,
@@ -211,10 +216,30 @@ impl SimpleComponent for Model {
 
                     gtk::Button {
                         set_label: "Send",
-                        add_css_class: "send-button",
                         set_width_request: 100,
                         connect_clicked => States::SendRequest,
+
+                        #[watch]
+                        set_class_active: ("send-button", !model.response_processing),
+
+                        #[watch]
+                        set_class_active: ("send-button-sending", model.response_processing),
+
+                        #[watch]
+                        set_sensitive: !model.response_processing
                     },
+
+                    gtk::Box {
+
+                        #[watch]
+                        set_visible: model.response_processing,
+
+                        gtk::Spinner {
+                            #[watch]
+                            set_spinning: model.response_processing,
+                        },
+                    }
+
                 },
 
                 gtk::Box{
@@ -335,8 +360,13 @@ fn main() {
         .error-message {
             color: #e62d42;
         }
+
         .send-button {
             background-color: #3584e4;
+        }
+
+        .send-button-sending {
+            background-color: #72a9ec;
         }
 
         .input-box{
@@ -346,7 +376,7 @@ fn main() {
             background-color: #1d1d20;
         }
 
-        .indput-box sourceview {
+        .input-box sourceview {
             background-color: transparent;
             color: #fcfcfc;
             font-family: monospace;
