@@ -218,6 +218,7 @@ impl SimpleComponent for Model {
                         set_label: "Send",
                         set_width_request: 100,
                         connect_clicked => States::SendRequest,
+                        add_css_class: "suggested-action",
 
                         #[watch]
                         set_class_active: ("send-button", !model.response_processing),
