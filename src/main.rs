@@ -28,6 +28,44 @@ pub enum States {
     BodySyntaxChanged(ContentType),
 }
 
+fn apply_dark_theme() {
+    // Mount the standard GTK dark theme stylesheet at THEME priority
+    if let Some(display) = gtk::gdk::Display::default() {
+        let provider = gtk::CssProvider::new();
+        if gtk::gio::resources_lookup_data(
+            "/org/gtk/libgtk/theme/Default/Default-dark.css",
+            gtk::gio::ResourceLookupFlags::NONE,
+        )
+        .is_ok()
+        {
+            provider.load_from_resource("/org/gtk/libgtk/theme/Default/Default-dark.css");
+            gtk::style_context_add_provider_for_display(
+                &display,
+                &provider,
+                gtk::STYLE_PROVIDER_PRIORITY_THEME,
+            );
+        } else if gtk::gio::resources_lookup_data(
+            "/org/gtk/libgtk/theme/Adwaita/gtk-dark.css",
+            gtk::gio::ResourceLookupFlags::NONE,
+        )
+        .is_ok()
+        {
+            provider.load_from_resource("/org/gtk/libgtk/theme/Adwaita/gtk-dark.css");
+            gtk::style_context_add_provider_for_display(
+                &display,
+                &provider,
+                gtk::STYLE_PROVIDER_PRIORITY_THEME,
+            );
+        }
+    }
+
+    if let Some(settings) = gtk::Settings::default() {
+        #[allow(deprecated)]
+        settings.set_gtk_application_prefer_dark_theme(true);
+        settings.set_gtk_theme_name(Some("Default-dark"));
+    }
+}
+
 #[relm4::component(pub)]
 impl SimpleComponent for Model {
     type Input = States;
@@ -39,7 +77,9 @@ impl SimpleComponent for Model {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        //syntax-highlighting init
+        apply_dark_theme();
+
+        // syntax-highlighting init
         let inp_sourceview_buff = sourceview5::Buffer::new(None);
         crate::misc::syntax_highlighter(&inp_sourceview_buff, "json");
 
@@ -57,9 +97,9 @@ impl SimpleComponent for Model {
             response_processing: false,
         };
 
-        //workaround for checkbutton issue
-        let first_button = gtk::CheckButton::builder()
-            .label("Json")
+        // First button of the segmented linked toggle button group
+        let first_button = gtk::ToggleButton::builder()
+            .label("JSON")
             .active(true)
             .build();
 
@@ -179,9 +219,8 @@ impl SimpleComponent for Model {
 
             gtk::Box{
                 set_orientation: gtk::Orientation::Vertical,
-                set_spacing: 40,
+                set_spacing: 20,
                 set_margin_all: 30,
-
 
                 gtk::Box{
                     set_orientation: gtk::Orientation::Horizontal,
@@ -203,15 +242,17 @@ impl SimpleComponent for Model {
                         }
                     },
 
-
                     gtk::Entry{
                         set_placeholder_text: Some("Enter address..."),
                         set_hexpand: true,
 
-                        //update text
+                        // update text
                         connect_changed[sender] => move |entry| {
                             sender.input(States::UpdateText(entry.text().to_string()));
-                        }
+                        },
+
+                        // send request on pressing Enter
+                        connect_activate => States::SendRequest,
                     },
 
                     gtk::Button {
@@ -231,7 +272,6 @@ impl SimpleComponent for Model {
                     },
 
                     gtk::Box {
-
                         #[watch]
                         set_visible: model.response_processing,
 
@@ -240,114 +280,138 @@ impl SimpleComponent for Model {
                             set_spinning: model.response_processing,
                         },
                     }
-
-                },
-
-                gtk::Box{
-                    set_orientation: gtk::Orientation::Horizontal,
-                    set_halign: gtk::Align::Center,
-                    set_spacing: 120,
-
-
-                    #[local_ref]
-                    first_button -> gtk::CheckButton{
-                        connect_toggled[sender] => move |btn| {
-                            if btn.is_active() {
-                                sender.input(States::ContentTypeSelected(0));
-                                sender.input(States::BodySyntaxChanged(ContentType::Json));
-                            }
-                        },
-                    },
-
-                    gtk::CheckButton{
-                        set_label: Some("Text"),
-                        set_group: Some(&first_button),
-
-                        connect_toggled[sender] => move |btn| {
-                            if btn.is_active() {
-                                sender.input(States::ContentTypeSelected(1));
-                                sender.input(States::BodySyntaxChanged(ContentType::Text));
-                            }
-                        },
-                    },
-
-                    gtk::CheckButton{
-                        set_label: Some("Xml"),
-                        set_group: Some(&first_button),
-
-                        connect_toggled[sender] => move |btn| {
-                            if btn.is_active() {
-                                sender.input(States::ContentTypeSelected(2));
-                                sender.input(States::BodySyntaxChanged(ContentType::Xml));
-                            }
-                        },
-                    },
-
-                    gtk::CheckButton{
-                        set_label: Some("Form"),
-                        set_group: Some(&first_button),
-
-                        connect_toggled[sender] => move |btn| {
-                            if btn.is_active() {
-                                sender.input(States::ContentTypeSelected(3));
-                                sender.input(States::BodySyntaxChanged(ContentType::Form));
-                            }
-                        },
-                    }
                 },
 
                 gtk::Label {
-
                     #[watch]
                     set_visible: model.error_message.is_some(),
 
-                   #[watch]
-                   set_label: model.error_message.as_deref().unwrap_or(""),
+                    #[watch]
+                    set_label: model.error_message.as_deref().unwrap_or(""),
 
-                   add_css_class: "error-message",
-
+                    add_css_class: "error-message",
                 },
 
-
-                gtk::ScrolledWindow{
+                // Request Body section with inline header bar
+                gtk::Box{
+                    set_orientation: gtk::Orientation::Vertical,
+                    set_spacing: 8,
+                    set_vexpand: true,
 
                     #[watch]
                     set_visible: model.input_enabled,
 
-                    add_css_class: "input-box",
+                    gtk::Box{
+                        set_orientation: gtk::Orientation::Horizontal,
+                        set_spacing: 12,
 
-                    set_vexpand: true,
-                    set_hexpand: true,
+                        gtk::Label{
+                            set_label: "Request Body",
+                            set_hexpand: true,
+                            set_xalign: 0.0,
+                            add_css_class: "section-label",
+                        },
 
-                    #[wrap(Some)]
-                    set_child = &sourceview5::View {
+                        gtk::Box{
+                            set_orientation: gtk::Orientation::Horizontal,
+                            add_css_class: "linked",
 
-                        //set_placeholder_text: Some("Request content"),
-                        set_monospace: true,
-                        set_buffer: Some(&model.message_body_buff),
+                            #[local_ref]
+                            first_button -> gtk::ToggleButton{
+                                connect_toggled[sender] => move |btn| {
+                                    if btn.is_active() {
+                                        sender.input(States::ContentTypeSelected(0));
+                                        sender.input(States::BodySyntaxChanged(ContentType::Json));
+                                    }
+                                },
+                            },
+
+                            gtk::ToggleButton{
+                                set_label: "Text",
+                                set_group: Some(&first_button),
+
+                                connect_toggled[sender] => move |btn| {
+                                    if btn.is_active() {
+                                        sender.input(States::ContentTypeSelected(1));
+                                        sender.input(States::BodySyntaxChanged(ContentType::Text));
+                                    }
+                                },
+                            },
+
+                            gtk::ToggleButton{
+                                set_label: "XML",
+                                set_group: Some(&first_button),
+
+                                connect_toggled[sender] => move |btn| {
+                                    if btn.is_active() {
+                                        sender.input(States::ContentTypeSelected(2));
+                                        sender.input(States::BodySyntaxChanged(ContentType::Xml));
+                                    }
+                                },
+                            },
+
+                            gtk::ToggleButton{
+                                set_label: "Form",
+                                set_group: Some(&first_button),
+
+                                connect_toggled[sender] => move |btn| {
+                                    if btn.is_active() {
+                                        sender.input(States::ContentTypeSelected(3));
+                                        sender.input(States::BodySyntaxChanged(ContentType::Form));
+                                    }
+                                },
+                            }
+                        }
+                    },
+
+                    gtk::ScrolledWindow{
+                        add_css_class: "input-box",
+                        set_vexpand: true,
+                        set_hexpand: true,
+
+                        #[wrap(Some)]
+                        set_child = &sourceview5::View {
+                            set_monospace: true,
+                            set_buffer: Some(&model.message_body_buff),
+                        }
                     }
                 },
 
-                gtk::ScrolledWindow {
+                // Response section with inline header bar
+                gtk::Box{
+                    set_orientation: gtk::Orientation::Vertical,
+                    set_spacing: 8,
+                    set_vexpand: true,
+
                     #[watch]
                     set_visible: model.error_message.is_none(),
 
-                    add_css_class: "output-box",
+                    gtk::Box{
+                        set_orientation: gtk::Orientation::Horizontal,
 
-                    set_vexpand: true,
-                    set_hexpand: true,
+                        gtk::Label{
+                            set_label: "Response",
+                            set_hexpand: true,
+                            set_xalign: 0.0,
+                            add_css_class: "section-label",
+                        },
+                    },
 
-                    #[wrap(Some)]
-                    set_child = &sourceview5::View {
-                        set_cursor_visible: false,
-                        set_editable: false,
-                        set_monospace: true,
+                    gtk::ScrolledWindow {
+                        add_css_class: "output-box",
+                        set_vexpand: true,
+                        set_hexpand: true,
 
-                        #[watch]
-                        set_buffer: Some(&model.response_body_buff),
+                        #[wrap(Some)]
+                        set_child = &sourceview5::View {
+                            set_cursor_visible: false,
+                            set_editable: false,
+                            set_monospace: true,
 
+                            #[watch]
+                            set_buffer: Some(&model.response_body_buff),
+                        }
                     }
-
                 },
             }
         }
@@ -355,8 +419,8 @@ impl SimpleComponent for Model {
 }
 
 fn main() {
-    let app = RelmApp::new("post.crab");
-    relm4::set_global_css(
+    let app = RelmApp::new("org.postcrab.PostCrab");
+    relm4::set_global_css_with_priority(
         "
         .error-message {
             color: #e62d42;
@@ -370,34 +434,38 @@ fn main() {
             background-color: #72a9ec;
         }
 
-        .input-box{
+        .section-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #9a9aa0;
+        }
+
+        .input-box,
+        .output-box {
             border-radius: 12px;
             padding: 16px;
-
             background-color: #1d1d20;
         }
 
-        .input-box sourceview {
-            background-color: transparent;
-            color: #fcfcfc;
-            font-family: monospace;
-            font-size: 14px;
-        }
-
-        .output-box{
-            border-radius: 12px;
-            padding: 16px;
-
-            background-color: #1d1d20;
-        }
-
-        .output-box sourceview {
+        .input-box textview,
+        .input-box textview text,
+        .input-box textview > text,
+        .input-box sourceview,
+        .input-box sourceview text,
+        .input-box sourceview > text,
+        .output-box textview,
+        .output-box textview text,
+        .output-box textview > text,
+        .output-box sourceview,
+        .output-box sourceview text,
+        .output-box sourceview > text {
             background-color: transparent;
             color: #fcfcfc;
             font-family: monospace;
             font-size: 14px;
         }
     ",
+        gtk::STYLE_PROVIDER_PRIORITY_USER,
     );
     app.run::<Model>(());
 }
