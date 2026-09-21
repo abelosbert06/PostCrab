@@ -29,7 +29,7 @@ pub enum States {
 }
 
 fn apply_dark_theme() {
-    // Mount the standard GTK dark theme stylesheet
+    // Mount the standard GTK dark theme stylesheet at THEME priority
     if let Some(display) = gtk::gdk::Display::default() {
         let provider = gtk::CssProvider::new();
         if gtk::gio::resources_lookup_data(
@@ -42,7 +42,7 @@ fn apply_dark_theme() {
             gtk::style_context_add_provider_for_display(
                 &display,
                 &provider,
-                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+                gtk::STYLE_PROVIDER_PRIORITY_THEME,
             );
         } else if gtk::gio::resources_lookup_data(
             "/org/gtk/libgtk/theme/Adwaita/gtk-dark.css",
@@ -54,7 +54,7 @@ fn apply_dark_theme() {
             gtk::style_context_add_provider_for_display(
                 &display,
                 &provider,
-                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+                gtk::STYLE_PROVIDER_PRIORITY_THEME,
             );
         }
     }
@@ -386,7 +386,7 @@ impl SimpleComponent for Model {
 
 fn main() {
     let app = RelmApp::new("org.postcrab.PostCrab");
-    relm4::set_global_css(
+    relm4::set_global_css_with_priority(
         "
         .error-message {
             color: #e62d42;
@@ -400,32 +400,32 @@ fn main() {
             background-color: #72a9ec;
         }
 
-        .input-box {
-            border-radius: 12px;
-            padding: 16px;
-            background-color: #1d1d20;
-        }
-
-        .input-box sourceview {
-            background-color: transparent;
-            color: #fcfcfc;
-            font-family: monospace;
-            font-size: 14px;
-        }
-
+        .input-box,
         .output-box {
             border-radius: 12px;
             padding: 16px;
             background-color: #1d1d20;
         }
 
-        .output-box sourceview {
+        .input-box textview,
+        .input-box textview text,
+        .input-box textview > text,
+        .input-box sourceview,
+        .input-box sourceview text,
+        .input-box sourceview > text,
+        .output-box textview,
+        .output-box textview text,
+        .output-box textview > text,
+        .output-box sourceview,
+        .output-box sourceview text,
+        .output-box sourceview > text {
             background-color: transparent;
             color: #fcfcfc;
             font-family: monospace;
             font-size: 14px;
         }
     ",
+        gtk::STYLE_PROVIDER_PRIORITY_USER,
     );
     app.run::<Model>(());
 }
