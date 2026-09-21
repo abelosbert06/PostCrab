@@ -97,9 +97,9 @@ impl SimpleComponent for Model {
             response_processing: false,
         };
 
-        // workaround for checkbutton issue
-        let first_button = gtk::CheckButton::builder()
-            .label("Json")
+        // First button of the segmented linked toggle button group
+        let first_button = gtk::ToggleButton::builder()
+            .label("JSON")
             .active(true)
             .build();
 
@@ -219,7 +219,7 @@ impl SimpleComponent for Model {
 
             gtk::Box{
                 set_orientation: gtk::Orientation::Vertical,
-                set_spacing: 40,
+                set_spacing: 20,
                 set_margin_all: 30,
 
                 gtk::Box{
@@ -282,58 +282,6 @@ impl SimpleComponent for Model {
                     }
                 },
 
-                gtk::Box{
-                    set_orientation: gtk::Orientation::Horizontal,
-                    set_halign: gtk::Align::Center,
-                    set_spacing: 120,
-
-                    #[local_ref]
-                    first_button -> gtk::CheckButton{
-                        connect_toggled[sender] => move |btn| {
-                            if btn.is_active() {
-                                sender.input(States::ContentTypeSelected(0));
-                                sender.input(States::BodySyntaxChanged(ContentType::Json));
-                            }
-                        },
-                    },
-
-                    gtk::CheckButton{
-                        set_label: Some("Text"),
-                        set_group: Some(&first_button),
-
-                        connect_toggled[sender] => move |btn| {
-                            if btn.is_active() {
-                                sender.input(States::ContentTypeSelected(1));
-                                sender.input(States::BodySyntaxChanged(ContentType::Text));
-                            }
-                        },
-                    },
-
-                    gtk::CheckButton{
-                        set_label: Some("Xml"),
-                        set_group: Some(&first_button),
-
-                        connect_toggled[sender] => move |btn| {
-                            if btn.is_active() {
-                                sender.input(States::ContentTypeSelected(2));
-                                sender.input(States::BodySyntaxChanged(ContentType::Xml));
-                            }
-                        },
-                    },
-
-                    gtk::CheckButton{
-                        set_label: Some("Form"),
-                        set_group: Some(&first_button),
-
-                        connect_toggled[sender] => move |btn| {
-                            if btn.is_active() {
-                                sender.input(States::ContentTypeSelected(3));
-                                sender.input(States::BodySyntaxChanged(ContentType::Form));
-                            }
-                        },
-                    }
-                },
-
                 gtk::Label {
                     #[watch]
                     set_visible: model.error_message.is_some(),
@@ -344,39 +292,125 @@ impl SimpleComponent for Model {
                     add_css_class: "error-message",
                 },
 
-                gtk::ScrolledWindow{
+                // Request Body section with inline header bar
+                gtk::Box{
+                    set_orientation: gtk::Orientation::Vertical,
+                    set_spacing: 8,
+                    set_vexpand: true,
+
                     #[watch]
                     set_visible: model.input_enabled,
 
-                    add_css_class: "input-box",
+                    gtk::Box{
+                        set_orientation: gtk::Orientation::Horizontal,
+                        set_spacing: 12,
 
-                    set_vexpand: true,
-                    set_hexpand: true,
+                        gtk::Label{
+                            set_label: "Request Body",
+                            set_hexpand: true,
+                            set_xalign: 0.0,
+                            add_css_class: "section-label",
+                        },
 
-                    #[wrap(Some)]
-                    set_child = &sourceview5::View {
-                        set_monospace: true,
-                        set_buffer: Some(&model.message_body_buff),
+                        gtk::Box{
+                            set_orientation: gtk::Orientation::Horizontal,
+                            add_css_class: "linked",
+
+                            #[local_ref]
+                            first_button -> gtk::ToggleButton{
+                                connect_toggled[sender] => move |btn| {
+                                    if btn.is_active() {
+                                        sender.input(States::ContentTypeSelected(0));
+                                        sender.input(States::BodySyntaxChanged(ContentType::Json));
+                                    }
+                                },
+                            },
+
+                            gtk::ToggleButton{
+                                set_label: "Text",
+                                set_group: Some(&first_button),
+
+                                connect_toggled[sender] => move |btn| {
+                                    if btn.is_active() {
+                                        sender.input(States::ContentTypeSelected(1));
+                                        sender.input(States::BodySyntaxChanged(ContentType::Text));
+                                    }
+                                },
+                            },
+
+                            gtk::ToggleButton{
+                                set_label: "XML",
+                                set_group: Some(&first_button),
+
+                                connect_toggled[sender] => move |btn| {
+                                    if btn.is_active() {
+                                        sender.input(States::ContentTypeSelected(2));
+                                        sender.input(States::BodySyntaxChanged(ContentType::Xml));
+                                    }
+                                },
+                            },
+
+                            gtk::ToggleButton{
+                                set_label: "Form",
+                                set_group: Some(&first_button),
+
+                                connect_toggled[sender] => move |btn| {
+                                    if btn.is_active() {
+                                        sender.input(States::ContentTypeSelected(3));
+                                        sender.input(States::BodySyntaxChanged(ContentType::Form));
+                                    }
+                                },
+                            }
+                        }
+                    },
+
+                    gtk::ScrolledWindow{
+                        add_css_class: "input-box",
+                        set_vexpand: true,
+                        set_hexpand: true,
+
+                        #[wrap(Some)]
+                        set_child = &sourceview5::View {
+                            set_monospace: true,
+                            set_buffer: Some(&model.message_body_buff),
+                        }
                     }
                 },
 
-                gtk::ScrolledWindow {
+                // Response section with inline header bar
+                gtk::Box{
+                    set_orientation: gtk::Orientation::Vertical,
+                    set_spacing: 8,
+                    set_vexpand: true,
+
                     #[watch]
                     set_visible: model.error_message.is_none(),
 
-                    add_css_class: "output-box",
+                    gtk::Box{
+                        set_orientation: gtk::Orientation::Horizontal,
 
-                    set_vexpand: true,
-                    set_hexpand: true,
+                        gtk::Label{
+                            set_label: "Response",
+                            set_hexpand: true,
+                            set_xalign: 0.0,
+                            add_css_class: "section-label",
+                        },
+                    },
 
-                    #[wrap(Some)]
-                    set_child = &sourceview5::View {
-                        set_cursor_visible: false,
-                        set_editable: false,
-                        set_monospace: true,
+                    gtk::ScrolledWindow {
+                        add_css_class: "output-box",
+                        set_vexpand: true,
+                        set_hexpand: true,
 
-                        #[watch]
-                        set_buffer: Some(&model.response_body_buff),
+                        #[wrap(Some)]
+                        set_child = &sourceview5::View {
+                            set_cursor_visible: false,
+                            set_editable: false,
+                            set_monospace: true,
+
+                            #[watch]
+                            set_buffer: Some(&model.response_body_buff),
+                        }
                     }
                 },
             }
@@ -398,6 +432,12 @@ fn main() {
 
         .send-button-sending {
             background-color: #72a9ec;
+        }
+
+        .section-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #9a9aa0;
         }
 
         .input-box,
