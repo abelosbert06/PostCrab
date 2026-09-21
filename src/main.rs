@@ -39,7 +39,13 @@ impl SimpleComponent for Model {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        //syntax-highlighting init
+        // Enable dark theme consistently across platforms
+        if let Some(settings) = gtk::Settings::default() {
+            #[allow(deprecated)]
+            settings.set_gtk_application_prefer_dark_theme(true);
+        }
+
+        // syntax-highlighting init
         let inp_sourceview_buff = sourceview5::Buffer::new(None);
         crate::misc::syntax_highlighter(&inp_sourceview_buff, "json");
 
@@ -57,7 +63,7 @@ impl SimpleComponent for Model {
             response_processing: false,
         };
 
-        //workaround for checkbutton issue
+        // workaround for checkbutton issue
         let first_button = gtk::CheckButton::builder()
             .label("Json")
             .active(true)
@@ -182,7 +188,6 @@ impl SimpleComponent for Model {
                 set_spacing: 40,
                 set_margin_all: 30,
 
-
                 gtk::Box{
                     set_orientation: gtk::Orientation::Horizontal,
                     set_spacing: 20,
@@ -203,15 +208,17 @@ impl SimpleComponent for Model {
                         }
                     },
 
-
                     gtk::Entry{
                         set_placeholder_text: Some("Enter address..."),
                         set_hexpand: true,
 
-                        //update text
+                        // update text
                         connect_changed[sender] => move |entry| {
                             sender.input(States::UpdateText(entry.text().to_string()));
-                        }
+                        },
+
+                        // send request on pressing Enter
+                        connect_activate => States::SendRequest,
                     },
 
                     gtk::Button {
@@ -231,7 +238,6 @@ impl SimpleComponent for Model {
                     },
 
                     gtk::Box {
-
                         #[watch]
                         set_visible: model.response_processing,
 
@@ -240,14 +246,12 @@ impl SimpleComponent for Model {
                             set_spinning: model.response_processing,
                         },
                     }
-
                 },
 
                 gtk::Box{
                     set_orientation: gtk::Orientation::Horizontal,
                     set_halign: gtk::Align::Center,
                     set_spacing: 120,
-
 
                     #[local_ref]
                     first_button -> gtk::CheckButton{
@@ -297,20 +301,16 @@ impl SimpleComponent for Model {
                 },
 
                 gtk::Label {
-
                     #[watch]
                     set_visible: model.error_message.is_some(),
 
-                   #[watch]
-                   set_label: model.error_message.as_deref().unwrap_or(""),
+                    #[watch]
+                    set_label: model.error_message.as_deref().unwrap_or(""),
 
-                   add_css_class: "error-message",
-
+                    add_css_class: "error-message",
                 },
 
-
                 gtk::ScrolledWindow{
-
                     #[watch]
                     set_visible: model.input_enabled,
 
@@ -321,8 +321,6 @@ impl SimpleComponent for Model {
 
                     #[wrap(Some)]
                     set_child = &sourceview5::View {
-
-                        //set_placeholder_text: Some("Request content"),
                         set_monospace: true,
                         set_buffer: Some(&model.message_body_buff),
                     }
@@ -345,9 +343,7 @@ impl SimpleComponent for Model {
 
                         #[watch]
                         set_buffer: Some(&model.response_body_buff),
-
                     }
-
                 },
             }
         }
@@ -355,7 +351,7 @@ impl SimpleComponent for Model {
 }
 
 fn main() {
-    let app = RelmApp::new("post.crab");
+    let app = RelmApp::new("org.postcrab.PostCrab");
     relm4::set_global_css(
         "
         .error-message {
@@ -370,31 +366,29 @@ fn main() {
             background-color: #72a9ec;
         }
 
-        .input-box{
+        .input-box {
             border-radius: 12px;
             padding: 16px;
-
             background-color: #1d1d20;
         }
 
         .input-box sourceview {
             background-color: transparent;
             color: #fcfcfc;
-            font-family: monospace;
+            font-family: \"SF Mono\", Menlo, Consolas, monospace;
             font-size: 14px;
         }
 
-        .output-box{
+        .output-box {
             border-radius: 12px;
             padding: 16px;
-
             background-color: #1d1d20;
         }
 
         .output-box sourceview {
             background-color: transparent;
             color: #fcfcfc;
-            font-family: monospace;
+            font-family: \"SF Mono\", Menlo, Consolas, monospace;
             font-size: 14px;
         }
     ",
