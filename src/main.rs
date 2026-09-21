@@ -28,6 +28,45 @@ pub enum States {
     BodySyntaxChanged(ContentType),
 }
 
+fn apply_dark_theme() {
+    // 1. Set display-level dark theme stylesheet from GTK resources
+    if let Some(display) = gtk::gdk::Display::default() {
+        let provider = gtk::CssProvider::new();
+        if gtk::gio::resources_lookup_data(
+            "/org/gtk/libgtk/theme/Default/Default-dark.css",
+            gtk::gio::ResourceLookupFlags::NONE,
+        )
+        .is_ok()
+        {
+            provider.load_from_resource("/org/gtk/libgtk/theme/Default/Default-dark.css");
+            gtk::style_context_add_provider_for_display(
+                &display,
+                &provider,
+                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+        } else if gtk::gio::resources_lookup_data(
+            "/org/gtk/libgtk/theme/Adwaita/gtk-dark.css",
+            gtk::gio::ResourceLookupFlags::NONE,
+        )
+        .is_ok()
+        {
+            provider.load_from_resource("/org/gtk/libgtk/theme/Adwaita/gtk-dark.css");
+            gtk::style_context_add_provider_for_display(
+                &display,
+                &provider,
+                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+        }
+    }
+
+    // 2. Configure GTK settings to prefer dark mode
+    if let Some(settings) = gtk::Settings::default() {
+        #[allow(deprecated)]
+        settings.set_gtk_application_prefer_dark_theme(true);
+        settings.set_gtk_theme_name(Some("Default-dark"));
+    }
+}
+
 #[relm4::component(pub)]
 impl SimpleComponent for Model {
     type Input = States;
@@ -39,11 +78,7 @@ impl SimpleComponent for Model {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        // Enable dark theme consistently across platforms
-        if let Some(settings) = gtk::Settings::default() {
-            #[allow(deprecated)]
-            settings.set_gtk_application_prefer_dark_theme(true);
-        }
+        apply_dark_theme();
 
         // syntax-highlighting init
         let inp_sourceview_buff = sourceview5::Buffer::new(None);
@@ -225,7 +260,6 @@ impl SimpleComponent for Model {
                         set_label: "Send",
                         set_width_request: 100,
                         connect_clicked => States::SendRequest,
-                        add_css_class: "suggested-action",
 
                         #[watch]
                         set_class_active: ("send-button", !model.response_processing),
@@ -354,22 +388,57 @@ fn main() {
     let app = RelmApp::new("org.postcrab.PostCrab");
     relm4::set_global_css(
         "
+        window {
+            background-color: #1e1e22;
+            color: #fcfcfc;
+        }
+
+        entry {
+            background-color: #2a2a2e;
+            color: #fcfcfc;
+            border: 1px solid #3c3c42;
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
+
+        entry:focus {
+            border-color: #3584e4;
+        }
+
+        dropdown > button {
+            background-color: #2a2a2e;
+            color: #fcfcfc;
+            border: 1px solid #3c3c42;
+            border-radius: 8px;
+            padding: 6px 12px;
+        }
+
+        checkbutton {
+            color: #dedede;
+        }
+
         .error-message {
             color: #e62d42;
         }
 
         .send-button {
             background-color: #3584e4;
+            color: #ffffff;
+            border-radius: 8px;
+            font-weight: bold;
         }
 
         .send-button-sending {
             background-color: #72a9ec;
+            color: #ffffff;
+            border-radius: 8px;
         }
 
         .input-box {
             border-radius: 12px;
             padding: 16px;
-            background-color: #1d1d20;
+            background-color: #161618;
+            border: 1px solid #2e2e34;
         }
 
         .input-box sourceview {
@@ -382,7 +451,8 @@ fn main() {
         .output-box {
             border-radius: 12px;
             padding: 16px;
-            background-color: #1d1d20;
+            background-color: #161618;
+            border: 1px solid #2e2e34;
         }
 
         .output-box sourceview {
