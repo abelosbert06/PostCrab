@@ -29,7 +29,7 @@ pub enum States {
 }
 
 fn apply_dark_theme() {
-    // 1. Set display-level dark theme stylesheet from GTK resources
+    // Mount the standard GTK dark theme stylesheet
     if let Some(display) = gtk::gdk::Display::default() {
         let provider = gtk::CssProvider::new();
         if gtk::gio::resources_lookup_data(
@@ -59,7 +59,6 @@ fn apply_dark_theme() {
         }
     }
 
-    // 2. Configure GTK settings to prefer dark mode
     if let Some(settings) = gtk::Settings::default() {
         #[allow(deprecated)]
         settings.set_gtk_application_prefer_dark_theme(true);
@@ -260,6 +259,7 @@ impl SimpleComponent for Model {
                         set_label: "Send",
                         set_width_request: 100,
                         connect_clicked => States::SendRequest,
+                        add_css_class: "suggested-action",
 
                         #[watch]
                         set_class_active: ("send-button", !model.response_processing),
@@ -388,77 +388,41 @@ fn main() {
     let app = RelmApp::new("org.postcrab.PostCrab");
     relm4::set_global_css(
         "
-        window {
-            background-color: #1e1e22;
-            color: #fcfcfc;
-        }
-
-        entry {
-            background-color: #2a2a2e;
-            color: #fcfcfc;
-            border: 1px solid #3c3c42;
-            border-radius: 8px;
-            padding: 8px 12px;
-        }
-
-        entry:focus {
-            border-color: #3584e4;
-        }
-
-        dropdown > button {
-            background-color: #2a2a2e;
-            color: #fcfcfc;
-            border: 1px solid #3c3c42;
-            border-radius: 8px;
-            padding: 6px 12px;
-        }
-
-        checkbutton {
-            color: #dedede;
-        }
-
         .error-message {
             color: #e62d42;
         }
 
         .send-button {
             background-color: #3584e4;
-            color: #ffffff;
-            border-radius: 8px;
-            font-weight: bold;
         }
 
         .send-button-sending {
             background-color: #72a9ec;
-            color: #ffffff;
-            border-radius: 8px;
         }
 
         .input-box {
             border-radius: 12px;
             padding: 16px;
-            background-color: #161618;
-            border: 1px solid #2e2e34;
+            background-color: #1d1d20;
         }
 
         .input-box sourceview {
             background-color: transparent;
             color: #fcfcfc;
-            font-family: \"SF Mono\", Menlo, Consolas, monospace;
+            font-family: monospace;
             font-size: 14px;
         }
 
         .output-box {
             border-radius: 12px;
             padding: 16px;
-            background-color: #161618;
-            border: 1px solid #2e2e34;
+            background-color: #1d1d20;
         }
 
         .output-box sourceview {
             background-color: transparent;
             color: #fcfcfc;
-            font-family: \"SF Mono\", Menlo, Consolas, monospace;
+            font-family: monospace;
             font-size: 14px;
         }
     ",
