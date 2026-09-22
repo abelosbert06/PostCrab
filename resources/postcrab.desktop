@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=PostCrab
+Comment=Fast and lightweight HTTP client built in Rust and GTK4
+Exec=postcrab-r4
+Icon=postcrab
+Terminal=false
+Type=Application
+Categories=Development;Network;WebDevelopment;
+Keywords=http;rest;api;postman;curl;
