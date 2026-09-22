@@ -21,6 +21,15 @@ Self-contained packages are automatically built and published on the [GitHub Rel
 | **Linux** | `.AppImage` | Standalone executable AppImage bundled with desktop integration, icons, and GLib schemas |
 | **Windows** | `.exe` | Self-contained Windows installer bundled with all required GTK4 runtime DLLs and schemas |
 
+> [!NOTE]
+> **macOS Gatekeeper:** Because PostCrab is an open-source project without a paid Apple Developer ID certificate, macOS Gatekeeper may flag the downloaded application when opened directly from the web. If you see a prompt indicating the app cannot be opened or is damaged:
+> - Either right-click (Control-click) `PostCrab.app` and select **Open**; or
+> - Navigate to **System Settings > Privacy & Security**, scroll down to **Security**, and click **Open Anyway**; or
+> - Run the following command in Terminal to clear the download quarantine attribute:
+>   ```bash
+>   xattr -cr /Applications/PostCrab.app
+>   ```
+
 ---
 
 ## Cross-Platform Setup & Build Instructions

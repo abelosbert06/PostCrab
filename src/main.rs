@@ -418,7 +418,30 @@ impl SimpleComponent for Model {
     }
 }
 
+fn init_bundle_env() {
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            // macOS .app bundle: PostCrab.app/Contents/MacOS/postcrab-r4 -> PostCrab.app/Contents/Resources/share
+            if let Some(contents_dir) = exe_dir.parent() {
+                let bundle_share = contents_dir.join("Resources").join("share");
+                if bundle_share.exists() {
+                    let schema_dir = bundle_share.join("glib-2.0").join("schemas");
+                    if schema_dir.exists() && std::env::var("GSETTINGS_SCHEMA_DIR").is_err() {
+                        std::env::set_var("GSETTINGS_SCHEMA_DIR", &schema_dir);
+                    }
+                    if let Ok(xdg) = std::env::var("XDG_DATA_DIRS") {
+                        std::env::set_var("XDG_DATA_DIRS", format!("{}:{}", bundle_share.display(), xdg));
+                    } else {
+                        std::env::set_var("XDG_DATA_DIRS", format!("{}:/usr/local/share:/usr/share", bundle_share.display()));
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn main() {
+    init_bundle_env();
     let app = RelmApp::new("org.postcrab.PostCrab");
     relm4::set_global_css_with_priority(
         "
