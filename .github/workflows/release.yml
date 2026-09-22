@@ -1,0 +1,207 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag Name (e.g. v0.1.0)'
+        required: false
+        default: 'v0.1.0'
+      is_draft:
+        description: 'Create Draft Release'
+        type: boolean
+        default: false
+      is_prerelease:
+        description: 'Mark as Pre-release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.platform.name }})
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: Linux x86_64
+            os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            archive_name: postcrab-linux-x86_64.tar.gz
+
+          - name: macOS arm64 (Apple Silicon)
+            os: macos-14
+            target: aarch64-apple-darwin
+            archive_name: postcrab-macos-arm64.tar.gz
+
+          - name: macOS x86_64 (Intel)
+            os: macos-13
+            target: x86_64-apple-darwin
+            archive_name: postcrab-macos-x86_64.tar.gz
+
+          - name: Windows x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-gnu
+            archive_name: postcrab-windows-x86_64.zip
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        if: runner.os != 'Windows'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libgtksourceview-5-dev libadwaita-1-dev pkg-config
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install gtk4 gtksourceview5 adwaita-icon-theme pkg-config
+
+      - name: Setup MSYS2 for Windows
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit
+          install: >-
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-gtksourceview5
+            mingw-w64-ucrt-x86_64-pkg-config
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-python
+            zip
+
+      - name: Install Rust GNU toolchain for Windows
+        if: runner.os == 'Windows'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+
+      - name: Build and Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cargo build --release --locked --target ${{ matrix.platform.target }}
+          mkdir -p package/postcrab-linux-x86_64
+          cp target/${{ matrix.platform.target }}/release/postcrab-r4 package/postcrab-linux-x86_64/
+          cp README.md package/postcrab-linux-x86_64/
+          tar -czvf ${{ matrix.platform.archive_name }} -C package postcrab-linux-x86_64
+
+      - name: Build and Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          export PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig:$(brew --prefix)/share/pkgconfig:$PKG_CONFIG_PATH"
+          cargo build --release --locked --target ${{ matrix.platform.target }}
+
+          APP_DIR="package/PostCrab.app"
+          mkdir -p "$APP_DIR/Contents/MacOS"
+          mkdir -p "$APP_DIR/Contents/Resources/share"
+
+          cp target/${{ matrix.platform.target }}/release/postcrab-r4 "$APP_DIR/Contents/MacOS/postcrab-r4"
+          cp resources/Info.plist "$APP_DIR/Contents/Info.plist"
+
+          SOURCEVIEW_SHARE="$(brew --prefix gtksourceview5)/share/gtksourceview-5"
+          if [ -d "$SOURCEVIEW_SHARE" ]; then
+            cp -r "$SOURCEVIEW_SHARE" "$APP_DIR/Contents/Resources/share/"
+          fi
+
+          cp target/${{ matrix.platform.target }}/release/postcrab-r4 package/postcrab-r4
+          cp README.md package/
+
+          tar -czvf ${{ matrix.platform.archive_name }} -C package PostCrab.app postcrab-r4 README.md
+
+      - name: Build and Package (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          cargo build --release --locked --target ${{ matrix.platform.target }}
+
+          PKG_DIR="package/postcrab-windows-x86_64"
+          mkdir -p "$PKG_DIR/share"
+          cp target/${{ matrix.platform.target }}/release/postcrab-r4.exe "$PKG_DIR/"
+          cp README.md "$PKG_DIR/"
+
+          cp -r /ucrt64/share/glib-2.0 "$PKG_DIR/share/"
+          cp -r /ucrt64/share/gtksourceview-5 "$PKG_DIR/share/"
+          if [ -d /ucrt64/share/icons ]; then
+            cp -r /ucrt64/share/icons "$PKG_DIR/share/"
+          fi
+          glib-compile-schemas "$PKG_DIR/share/glib-2.0/schemas/"
+
+          python3 - << 'PYEOF'
+          import os, subprocess, shutil
+
+          pkg_dir = "package/postcrab-windows-x86_64"
+          copied = set()
+          to_scan = [os.path.join(pkg_dir, "postcrab-r4.exe")]
+
+          while to_scan:
+              curr = to_scan.pop()
+              res = subprocess.run(["ldd", curr], capture_output=True, text=True)
+              for line in res.stdout.splitlines():
+                  for token in line.strip().split():
+                      if "/ucrt64/bin/" in token and token.endswith(".dll"):
+                          dll_path = token[token.find("/ucrt64/bin/"):]
+                          dll_name = os.path.basename(dll_path)
+                          if dll_name not in copied and os.path.exists(dll_path):
+                              copied.add(dll_name)
+                              dest = os.path.join(pkg_dir, dll_name)
+                              shutil.copy2(dll_path, dest)
+                              to_scan.append(dest)
+          PYEOF
+
+          cd package
+          zip -r "../${{ matrix.platform.archive_name }}" postcrab-windows-x86_64
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform.archive_name }}
+          path: ${{ matrix.platform.archive_name }}
+          if-no-files-found: error
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Determine Release Tag
+        id: release_info
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag_name }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          files: release-assets/*
+          draft: ${{ github.event_name == 'workflow_dispatch' && inputs.is_draft || false }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.is_prerelease || false }}
+          generate_release_notes: true
