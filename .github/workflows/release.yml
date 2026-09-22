@@ -73,7 +73,7 @@ jobs:
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
         run: |
-          brew install gtk4 gtksourceview5 adwaita-icon-theme pkg-config
+          brew install gtk4 gtksourceview5 adwaita-icon-theme pkg-config dylibbundler
 
       - name: Setup MSYS2 for Windows
         if: runner.os == 'Windows'
@@ -149,17 +149,42 @@ jobs:
           export PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig:$(brew --prefix)/share/pkgconfig:$PKG_CONFIG_PATH"
           cargo build --release --locked --target ${{ matrix.platform.target }}
 
+          BREW_PREFIX="$(brew --prefix)"
           APP_DIR="package/PostCrab.app"
           mkdir -p "$APP_DIR/Contents/MacOS"
-          mkdir -p "$APP_DIR/Contents/Resources/share"
+          mkdir -p "$APP_DIR/Contents/Frameworks"
+          mkdir -p "$APP_DIR/Contents/Resources/share/glib-2.0/schemas"
+          mkdir -p "$APP_DIR/Contents/Resources/share/icons"
 
           cp target/${{ matrix.platform.target }}/release/postcrab-r4 "$APP_DIR/Contents/MacOS/postcrab-r4"
           cp resources/Info.plist "$APP_DIR/Contents/Info.plist"
+          if [ -f "resources/PostCrab.icns" ]; then
+            cp resources/PostCrab.icns "$APP_DIR/Contents/Resources/PostCrab.icns"
+          fi
 
-          SOURCEVIEW_SHARE="$(brew --prefix gtksourceview5)/share/gtksourceview-5"
+          # GLib schemas
+          cp -r "$BREW_PREFIX/share/glib-2.0/schemas/"* "$APP_DIR/Contents/Resources/share/glib-2.0/schemas/"
+          glib-compile-schemas "$APP_DIR/Contents/Resources/share/glib-2.0/schemas/"
+
+          # GtkSourceView-5 syntax data & styles
+          SOURCEVIEW_SHARE="$BREW_PREFIX/share/gtksourceview-5"
           if [ -d "$SOURCEVIEW_SHARE" ]; then
             cp -r "$SOURCEVIEW_SHARE" "$APP_DIR/Contents/Resources/share/"
           fi
+
+          # Icons
+          if [ -d "$BREW_PREFIX/share/icons/Adwaita" ]; then
+            cp -r "$BREW_PREFIX/share/icons/Adwaita" "$APP_DIR/Contents/Resources/share/icons/"
+          fi
+          if [ -d "$BREW_PREFIX/share/icons/hicolor" ]; then
+            cp -r "$BREW_PREFIX/share/icons/hicolor" "$APP_DIR/Contents/Resources/share/icons/"
+          fi
+
+          # Bundle all dynamic libraries and rewrite @rpath load commands
+          dylibbundler -b -x "$APP_DIR/Contents/MacOS/postcrab-r4" -d "$APP_DIR/Contents/Frameworks" -p "@executable_path/../Frameworks" -s "$BREW_PREFIX/lib" -od
+
+          # Ad-hoc sign the entire app bundle and all nested frameworks
+          codesign --force --deep --sign - "$APP_DIR"
 
           mkdir -p dmg_root
           cp -r "$APP_DIR" dmg_root/
@@ -167,6 +192,7 @@ jobs:
           ln -s /Applications dmg_root/Applications
 
           hdiutil create -volname "PostCrab" -srcfolder dmg_root -ov -format UDZO "${{ matrix.platform.archive_name }}"
+          codesign --force --sign - "${{ matrix.platform.archive_name }}"
 
       - name: Build and Package (Windows)
         if: runner.os == 'Windows'
