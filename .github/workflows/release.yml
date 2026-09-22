@@ -40,11 +40,6 @@ jobs:
             target: aarch64-apple-darwin
             archive_name: postcrab-macos-arm64.tar.gz
 
-          - name: macOS x86_64 (Intel)
-            os: macos-13
-            target: x86_64-apple-darwin
-            archive_name: postcrab-macos-x86_64.tar.gz
-
           - name: Windows x86_64
             os: windows-latest
             target: x86_64-pc-windows-gnu
@@ -86,11 +81,11 @@ jobs:
             mingw-w64-ucrt-x86_64-python
             zip
 
-      - name: Install Rust GNU toolchain for Windows
+      - name: Setup Rust GNU toolchain for Windows
         if: runner.os == 'Windows'
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-gnu
+        run: |
+          rustup set default-host x86_64-pc-windows-gnu
+          rustup toolchain install stable-x86_64-pc-windows-gnu --default
 
       - name: Build and Package (Linux)
         if: runner.os == 'Linux'
@@ -127,6 +122,9 @@ jobs:
       - name: Build and Package (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
+        env:
+          PKG_CONFIG_ALLOW_CROSS: "1"
+          PKG_CONFIG_PATH: "/ucrt64/lib/pkgconfig"
         run: |
           cargo build --release --locked --target ${{ matrix.platform.target }}
 
@@ -135,33 +133,43 @@ jobs:
           cp target/${{ matrix.platform.target }}/release/postcrab-r4.exe "$PKG_DIR/"
           cp README.md "$PKG_DIR/"
 
-          cp -r /ucrt64/share/glib-2.0 "$PKG_DIR/share/"
-          cp -r /ucrt64/share/gtksourceview-5 "$PKG_DIR/share/"
-          if [ -d /ucrt64/share/icons ]; then
-            cp -r /ucrt64/share/icons "$PKG_DIR/share/"
+          UCRT_PREFIX="$(cygpath -u "$MINGW_PREFIX")"
+          cp -r "$UCRT_PREFIX/share/glib-2.0" "$PKG_DIR/share/"
+          cp -r "$UCRT_PREFIX/share/gtksourceview-5" "$PKG_DIR/share/"
+          if [ -d "$UCRT_PREFIX/share/icons" ]; then
+            cp -r "$UCRT_PREFIX/share/icons" "$PKG_DIR/share/"
           fi
           glib-compile-schemas "$PKG_DIR/share/glib-2.0/schemas/"
 
           python3 - << 'PYEOF'
-          import os, subprocess, shutil
+          import os, sys, subprocess, shutil
 
           pkg_dir = "package/postcrab-windows-x86_64"
           copied = set()
           to_scan = [os.path.join(pkg_dir, "postcrab-r4.exe")]
+          ucrt_bin = os.path.join(sys.prefix, "bin")
 
           while to_scan:
               curr = to_scan.pop()
               res = subprocess.run(["ldd", curr], capture_output=True, text=True)
               for line in res.stdout.splitlines():
                   for token in line.strip().split():
-                      if "/ucrt64/bin/" in token and token.endswith(".dll"):
-                          dll_path = token[token.find("/ucrt64/bin/"):]
-                          dll_name = os.path.basename(dll_path)
-                          if dll_name not in copied and os.path.exists(dll_path):
-                              copied.add(dll_name)
-                              dest = os.path.join(pkg_dir, dll_name)
-                              shutil.copy2(dll_path, dest)
-                              to_scan.append(dest)
+                      clean = token.strip("()").replace("\\", "/")
+                      if clean.lower().endswith(".dll"):
+                          if os.path.isfile(clean):
+                              dll_path = clean
+                          elif os.path.isfile(os.path.join(ucrt_bin, os.path.basename(clean))):
+                              dll_path = os.path.join(ucrt_bin, os.path.basename(clean))
+                          else:
+                              continue
+                          if "windows" not in dll_path.lower() and "system32" not in dll_path.lower():
+                              dll_name = os.path.basename(dll_path)
+                              if dll_name not in copied:
+                                  copied.add(dll_name)
+                                  dest = os.path.join(pkg_dir, dll_name)
+                                  shutil.copy2(dll_path, dest)
+                                  to_scan.append(dest)
+          print(f"Copied {len(copied)} runtime DLLs for Windows package.")
           PYEOF
 
           cd package
