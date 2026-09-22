@@ -11,6 +11,12 @@
 
 ---
 
+## Releases & Downloads
+
+Pre-built standalone releases for **Windows**, **macOS** (Apple Silicon & Intel), and **Linux** are automatically built and published on the [GitHub Releases](https://github.com/abelosbert06/PostCrab/releases) page whenever a new version tag (`v*`) is pushed.
+
+---
+
 ## Cross-Platform Setup & Build Instructions
 
 ### macOS (Apple Silicon & Intel)
