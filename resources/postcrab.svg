@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="crabGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6b4a"/>
+      <stop offset="100%" stop-color="#e0311e"/>
+    </linearGradient>
+    <linearGradient id="shellGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff7d5e"/>
+      <stop offset="100%" stop-color="#c92514"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle -->
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="#1e1e24" filter="url(#shadow)"/>
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="none" stroke="#2e2e38" stroke-width="2"/>
+
+  <!-- Left Claw -->
+  <path d="M 28 62 C 16 52 18 36 30 30 C 38 26 46 32 44 42 C 34 38 28 46 36 54 Z" fill="url(#crabGrad)"/>
+  <path d="M 38 44 C 44 38 52 42 50 50 C 44 54 38 50 38 44 Z" fill="url(#crabGrad)"/>
+  <!-- Right Claw -->
+  <path d="M 100 62 C 112 52 110 36 98 30 C 90 26 82 32 84 42 C 94 38 100 46 92 54 Z" fill="url(#crabGrad)"/>
+  <path d="M 90 44 C 84 38 76 42 78 50 C 84 54 90 50 90 44 Z" fill="url(#crabGrad)"/>
+
+  <!-- Legs -->
+  <path d="M 34 76 C 22 78 20 90 22 96 C 24 96 28 88 38 84 Z" fill="#d4321f"/>
+  <path d="M 38 84 C 28 90 28 102 32 108 C 34 106 38 98 44 92 Z" fill="#b82615"/>
+  <path d="M 94 76 C 106 78 108 90 106 96 C 104 96 100 88 90 84 Z" fill="#d4321f"/>
+  <path d="M 90 84 C 100 90 100 102 96 108 C 94 106 90 98 84 92 Z" fill="#b82615"/>
+
+  <!-- Main Body Shell -->
+  <ellipse cx="64" cy="74" rx="34" ry="24" fill="url(#shellGrad)"/>
+
+  <!-- Eye stalks -->
+  <rect x="46" y="44" width="6" height="14" rx="3" fill="#e0311e"/>
+  <rect x="76" y="44" width="6" height="14" rx="3" fill="#e0311e"/>
+  <!-- Eyes Outer -->
+  <circle cx="49" cy="44" r="8" fill="#ffffff"/>
+  <circle cx="79" cy="44" r="8" fill="#ffffff"/>
+  <!-- Pupils -->
+  <circle cx="50" cy="43" r="4.5" fill="#1e1e24"/>
+  <circle cx="78" cy="43" r="4.5" fill="#1e1e24"/>
+  <!-- Eye sparkles -->
+  <circle cx="51.5" cy="41.5" r="1.5" fill="#ffffff"/>
+  <circle cx="79.5" cy="41.5" r="1.5" fill="#ffffff"/>
+
+  <!-- HTTP / Arrow Symbol on shell -->
+  <path d="M 52 74 L 64 64 L 76 74" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+  <line x1="64" y1="65" x2="64" y2="85" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.95"/>
+</svg>

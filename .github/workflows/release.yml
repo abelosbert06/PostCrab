@@ -33,17 +33,17 @@ jobs:
           - name: Linux x86_64
             os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            archive_name: postcrab-linux-x86_64.tar.gz
+            archive_name: postcrab-linux-x86_64.AppImage
 
           - name: macOS arm64 (Apple Silicon)
             os: macos-14
             target: aarch64-apple-darwin
-            archive_name: postcrab-macos-arm64.tar.gz
+            archive_name: postcrab-macos-arm64.dmg
 
           - name: Windows x86_64
             os: windows-latest
             target: x86_64-pc-windows-gnu
-            archive_name: postcrab-windows-x86_64.zip
+            archive_name: postcrab-windows-x86_64-setup.exe
 
     steps:
       - name: Checkout repository
@@ -59,7 +59,16 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libgtksourceview-5-dev libadwaita-1-dev pkg-config
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libgtksourceview-5-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            librsvg2-bin \
+            libfuse2t64 \
+            file \
+            wget \
+            desktop-file-utils
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
@@ -87,16 +96,54 @@ jobs:
           rustup set default-host x86_64-pc-windows-gnu
           rustup toolchain install stable-x86_64-pc-windows-gnu --default
 
-      - name: Build and Package (Linux)
+      - name: Build and Package AppImage (Linux)
         if: runner.os == 'Linux'
         run: |
           cargo build --release --locked --target ${{ matrix.platform.target }}
-          mkdir -p package/postcrab-linux-x86_64
-          cp target/${{ matrix.platform.target }}/release/postcrab-r4 package/postcrab-linux-x86_64/
-          cp README.md package/postcrab-linux-x86_64/
-          tar -czvf ${{ matrix.platform.archive_name }} -C package postcrab-linux-x86_64
 
-      - name: Build and Package (macOS)
+          # Construct AppDir structure
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/scalable/apps
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          mkdir -p AppDir/usr/share/glib-2.0/schemas
+          mkdir -p AppDir/usr/share/gtksourceview-5
+
+          # Main application binary
+          cp target/${{ matrix.platform.target }}/release/postcrab-r4 AppDir/usr/bin/
+
+          # Desktop entry and icon
+          cp resources/postcrab.desktop AppDir/
+          cp resources/postcrab.desktop AppDir/usr/share/applications/
+          cp resources/postcrab.svg AppDir/
+          cp resources/postcrab.svg AppDir/usr/share/icons/hicolor/scalable/apps/
+
+          # Render 256x256 PNG icon
+          rsvg-convert -w 256 -h 256 resources/postcrab.svg -o AppDir/postcrab.png
+          cp AppDir/postcrab.png AppDir/.DirIcon
+          cp AppDir/postcrab.png AppDir/usr/share/icons/hicolor/256x256/apps/postcrab.png
+
+          # GLib schemas & GtkSourceView-5 syntax data
+          cp -r /usr/share/glib-2.0/schemas/* AppDir/usr/share/glib-2.0/schemas/
+          glib-compile-schemas AppDir/usr/share/glib-2.0/schemas/
+
+          if [ -d /usr/share/gtksourceview-5 ]; then
+            cp -r /usr/share/gtksourceview-5/* AppDir/usr/share/gtksourceview-5/
+          fi
+
+          # AppRun entrypoint
+          cp resources/AppRun AppDir/AppRun
+          chmod +x AppDir/AppRun
+
+          # Download and execute appimagetool
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          export ARCH=x86_64
+          ./appimagetool AppDir "${{ matrix.platform.archive_name }}"
+
+      - name: Build and Package DMG (macOS)
         if: runner.os == 'macOS'
         run: |
           export PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig:$(brew --prefix)/share/pkgconfig:$PKG_CONFIG_PATH"
@@ -114,10 +161,12 @@ jobs:
             cp -r "$SOURCEVIEW_SHARE" "$APP_DIR/Contents/Resources/share/"
           fi
 
-          cp target/${{ matrix.platform.target }}/release/postcrab-r4 package/postcrab-r4
-          cp README.md package/
+          mkdir -p dmg_root
+          cp -r "$APP_DIR" dmg_root/
+          cp README.md dmg_root/
+          ln -s /Applications dmg_root/Applications
 
-          tar -czvf ${{ matrix.platform.archive_name }} -C package PostCrab.app postcrab-r4 README.md
+          hdiutil create -volname "PostCrab" -srcfolder dmg_root -ov -format UDZO "${{ matrix.platform.archive_name }}"
 
       - name: Build and Package (Windows)
         if: runner.os == 'Windows'
@@ -172,8 +221,11 @@ jobs:
           print(f"Copied {len(copied)} runtime DLLs for Windows package.")
           PYEOF
 
-          cd package
-          zip -r "../${{ matrix.platform.archive_name }}" postcrab-windows-x86_64
+      - name: Compile Inno Setup Installer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Q resources/installer.iss
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4

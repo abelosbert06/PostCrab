@@ -6,14 +6,20 @@
 </br>
 
 ## Screenshots
-<img width="1233" height="936" alt="image" src="https://github.com/user-attachments/assets/c16fadff-c96c-425b-9d25-b71c23b1926e" />
-<img width="1233" height="936" alt="image" src="https://github.com/user-attachments/assets/ea6305e4-19d2-445b-852c-8a22b95217dc" />
+<img width="1233" height="936" alt="image" src="https://github.com/user-attachments/assets/c16fadff-c96c-425b-9d25-b71c23b1926e\" />
+<img width="1233" height="936" alt="image" src="https://github.com/user-attachments/assets/ea6305e4-19d2-445b-852c-8a22b95217dc\" />
 
 ---
 
 ## Releases & Downloads
 
-Pre-built standalone releases for **Windows**, **macOS** (Apple Silicon & Intel), and **Linux** are automatically built and published on the [GitHub Releases](https://github.com/abelosbert06/PostCrab/releases) page whenever a new version tag (`v*`) is pushed.
+Self-contained packages are automatically built and published on the [GitHub Releases](https://github.com/abelosbert06/PostCrab/releases) page for each new release tag (`v*`):
+
+| Platform | Format | Description |
+|---|---|---|
+| **macOS** | `.dmg` | Mountable Apple Silicon disk image containing `PostCrab.app` (drag-and-drop to `/Applications`) |
+| **Linux** | `.AppImage` | Standalone executable AppImage bundled with desktop integration, icons, and GLib schemas |
+| **Windows** | `.exe` | Self-contained Windows installer bundled with all required GTK4 runtime DLLs and schemas |
 
 ---
 
